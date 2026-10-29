@@ -1,5 +1,7 @@
 #coding: utf-8
 
+from curses import use_default_colors
+
 import pandas as pd
 import numpy as np
 from scipy.sparse import coo_array, csr_array
@@ -18,7 +20,7 @@ from .preprocessing import meanimputation_standardize
 
 def generate_dummy_dataset(npositive, nnegative, nfeatures, mean, std, random_state=12454):
     '''
-    Creates a dummy dataset where the positive and negative (item, user) pairs are arbitrarily similar. 
+    Creates a dummy dataset where the positive and negative (item, user) pairs are arbitrarily similar.
 
     Each of the nfeatures features for (item, user) pair feature vectors associated with positive ratings are drawn from a Gaussian distribution of mean mean and standard deviation std, whereas those for negative ratings are drawn from from a Gaussian distribution of mean -mean and standard deviation std. User and item feature matrices of shape (nfeatures//2, npositive+nnegative) are generated, which are the concatenation of npositive positive and nnegative negative pair feature vectors generated from Gaussian distributions. Thus there are npositive^2 positive ratings (each "positive" user with a "positive" item), nnegative^2 negative ratings (idem), and the remainder is unknown (that is, (npositive+nnegative)^2-npositive^2-nnegative^2 ratings).
 
@@ -83,7 +85,7 @@ class Dataset(object):
     Attributes
     ----------
     name : str
-        name of the dataset 
+        name of the dataset
     ratings : COO-array of shape (n_items, n_users)
         an array which contains values in {-1, 0, 1} describing the negative, unlabelled/unavailable, positive user-item matchings
     folds : COO-array of shape (n_items, n_users)
@@ -177,12 +179,16 @@ class Dataset(object):
             assert len(features)>0
             self.user_features = features
             self.item_features = features
-            users = users.loc[features]
-            items = items.loc[features]
+            users = users.iloc[features]
+            items = items.iloc[features]
         ## format
         self.name = name
         self.ratings = coo_array(np.nan_to_num(ratings_, copy=True, nan=0))
-        ids = np.argwhere(~np.isnan(ratings_))
+        try:
+            ids = np.argwhere(~np.isnan(ratings_))
+        except TypeError:
+            mask = ~np.isnan(ratings_.data)
+            ids = np.column_stack((ratings_.row[mask], ratings_.col[mask]))
         row = ids[:,0].ravel()
         col = ids[:,1].ravel()
         data = [1]*ids.shape[0]
@@ -242,7 +248,7 @@ class Dataset(object):
         restricted_ratings = self.ratings.toarray()[np.abs(self.ratings).sum(axis=1)>0,:]
         restricted_ratings = restricted_ratings[:,np.abs(restricted_ratings).sum(axis=0)>0]
         print("Including %d drugs and %d diseases involved in at least one positive/negative rating" % restricted_ratings.shape)
-        print("%d positive, %d negative, %d unlabeled (including %d unavailable) drug-disease ratings" % ((self.ratings==1).sum(), (self.ratings==-1).sum(), np.prod(self.ratings.shape)-self.ratings.getnnz(), np.prod(self.folds.shape)-self.folds.getnnz()))
+        print("%d positive, %d negative, %d unlabeled (including %d unavailable) drug-disease ratings" % ((self.ratings==1).sum(), (self.ratings==-1).sum(), np.prod(self.ratings.shape)-self.ratings.nnz, np.prod(self.folds.shape)-self.folds.nnz))
         print("Sparsity: %.2f percent (on drugs/diseases with at least one known rating %.2f)" % ((self.ratings!=0).mean()*100, (restricted_ratings!=0).mean()*100))
         print(sep[:len(sep)//2])
         print("* Feature matrices:")
@@ -255,11 +261,11 @@ class Dataset(object):
         if (self.users.shape[0]+self.items.shape[0]==0):
             print("No feature matrices.")
         print(sep+"\n")
-        return self.nitems, self.nusers, restricted_ratings.shape[0], restricted_ratings.shape[1], (self.ratings==1).sum(), (self.ratings==-1).sum(), np.prod(self.ratings.shape)-self.ratings.getnnz(), np.prod(self.folds.shape)-self.folds.getnnz(), (self.ratings!=0).mean()*100, (restricted_ratings!=0).mean()*100, self.items.shape[0], np.isnan(self.items.toarray()).mean()*100, self.users.shape[0], np.isnan(self.users.toarray()).mean()*100
+        return self.nitems, self.nusers, restricted_ratings.shape[0], restricted_ratings.shape[1], (self.ratings==1).sum(), (self.ratings==-1).sum(), np.prod(self.ratings.shape)-self.ratings.nnz, np.prod(self.folds.shape)-self.folds.nnz, (self.ratings!=0).mean()*100, (restricted_ratings!=0).mean()*100, self.items.shape[0], np.isnan(self.items.toarray()).mean()*100, self.users.shape[0], np.isnan(self.users.toarray()).mean()*100
 
     def visualize(self, withzeros=False, X=None, y=None, metric="euclidean", figsize=(5,5), fontsize=20, dimred_args={}, predictions=None, use_ratings=False, random_state=1234, show_errors=False, verbose=False):
         '''
-        Plots a representation of the datapoints in a stanscofi.Dataset which is annotated either by the ground truth labels or the predicted labels. The representation is the plot of the datapoints according to the first two Principal Components, or the first two dimensions in UMAP, if the feature matrices can be converted into a (n_ratings, n_features) shaped matrix where n_features>1, else it plots a heatmap with the values in the matrix for each rating pair. 
+        Plots a representation of the datapoints in a stanscofi.Dataset which is annotated either by the ground truth labels or the predicted labels. The representation is the plot of the datapoints according to the first two Principal Components, or the first two dimensions in UMAP, if the feature matrices can be converted into a (n_ratings, n_features) shaped matrix where n_features>1, else it plots a heatmap with the values in the matrix for each rating pair.
 
         In the legend, ground truth labels are denoted with brackets: e.g., [0] (unknown), [1] (positive) and [-1] (negative); predicted ratings are denoted by "pos" (positive) and "neg" (negative); correct (resp., incorrect) predictions are denoted by "correct", resp. "error"
 
@@ -386,18 +392,18 @@ class Dataset(object):
                 else:
                     plt.scatter(dimred_X[all_pairs_k,0], dimred_X[all_pairs_k,1], c=mkr[0], marker=mkr[1], zorder=layer[mkr], alpha=alpha[mkr] if (predictions is None) else (0.8 if (not show_errors) else 1))
             if (show_errors):
-                handles = [mlines.Line2D([], [], color={'r':'red','g':'green','y':'yellow'}[k[0]], 
+                handles = [mlines.Line2D([], [], color={'r':'red','g':'green','y':'yellow'}[k[0]],
                     label={'r':'error   ','g':'correct', 'y': 'unknown'}[k[0]]+" "+({".": "[ 0]", "+": "[ 1]", "v": "[-1]"}[k[1]]),
 		    marker=k[1] if (predictions is not None) else '.', markersize=fontsize,
 		    ) for k in np.unique(np.asarray(all_pairs[:,-1], dtype=str)).tolist() if (withzeros or k[0]!="y")]
             else:
                 if (predictions is None):
-                    handles = [mlines.Line2D([], [], color={'r':'red','g':'green','y':'yellow'}[k[0]], 
+                    handles = [mlines.Line2D([], [], color={'r':'red','g':'green','y':'yellow'}[k[0]],
                         label={'r':'[-1]','y':'[ 0]','g':"[ 1]"}[k[0]],
 		        marker=k[1] if (predictions is not None) else '.', markersize=fontsize,
 		        ) for k in np.unique(np.asarray(all_pairs[:,-1], dtype=str)).tolist() if (withzeros or k[0]!="y")]
                 else:
-                    handles = [mlines.Line2D([], [], color={'r':'red','g':'green','y':'yellow'}[k[0]], 
+                    handles = [mlines.Line2D([], [], color={'r':'red','g':'green','y':'yellow'}[k[0]],
                         label={'r':'neg','g':"pos", 'y':'unl'}[k[0]]+" "+{".": "[ 0]", "+": "[ 1]", "v": "[-1]"}[k[1]],
 		        marker=k[1] if (predictions is not None) else '.', markersize=fontsize,
 		        ) for k in np.unique(np.asarray(all_pairs[:,-1], dtype=str)).tolist() if (withzeros or k[0]!="y")]
@@ -410,22 +416,22 @@ class Dataset(object):
             plt.show()
         elif ((dimred_X!=0).any()):
             ## Prints a heatmap according to values in X
-            X_reshape_folds = coo_array((X.ravel(), (self.folds.row, self.folds.col)), 
+            X_reshape_folds = coo_array((X.ravel(), (self.folds.row, self.folds.col)),
                             shape=self.folds.shape)
             X_heatmap = X_reshape_folds.toarray()
             annot = self.ratings.toarray().astype(int).astype(str)
             annot[annot=="0"] = "" #unknown
             annot[annot=="1"] = "+"  #positive
             annot[annot=="-1"] = "*"  #negative
-            keep_ids_y = np.abs(X_heatmap).sum(axis=1)>0 
-            keep_ids_x = np.abs(X_heatmap).sum(axis=0)>0 
+            keep_ids_y = np.abs(X_heatmap).sum(axis=1)>0
+            keep_ids_x = np.abs(X_heatmap).sum(axis=0)>0
             X_heatmap = X_heatmap[keep_ids_y,:][:,keep_ids_x]
             annot = annot[keep_ids_y,:][:,keep_ids_x]
             h = sns.clustermap(X_heatmap, method='average', cmap="viridis", metric=metric, annot=annot, fmt="s", figsize=figsize)
-            h.ax_heatmap.set_xlabel("Disease", fontsize=fontsize) 
+            h.ax_heatmap.set_xlabel("Disease", fontsize=fontsize)
             h.ax_heatmap.set_ylabel("Drug", fontsize=fontsize)
             h.ax_heatmap.set_xticklabels([])
-            h.ax_heatmap.set_yticklabels([]) 
+            h.ax_heatmap.set_yticklabels([])
             handles = [mlines.Line2D([], [], color="black", marker=k) for k in ["+", "*"] if (k in annot)]
             h.ax_heatmap.legend(handles, ["Positive", "Negative"], fontsize=fontsize, loc='upper right', bbox_to_anchor=(1.6,0.9))
             plt.show()

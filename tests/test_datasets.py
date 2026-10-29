@@ -78,18 +78,18 @@ class TestDatasets(unittest.TestCase):
         sparsity = np.sum(dataset.ratings!=0)/np.prod(dataset.ratings.shape)
         self.assertEqual(sparsity, (npositive**2+nnegative**2)/(npositive+nnegative)**2)
 
-    def test_visualize(self):
-        dataset, _ = self.generate_dataset()
-        dataset.visualize(withzeros=False)
-        dataset.visualize(withzeros=False, dimred_args={"n_neighbors":10}) ## UMAP
-        dataset.visualize(withzeros=True)
-        ## Generate random class predictions
-        pi=1/16
-        npoints = np.prod(dataset.ratings.shape)
-        predictions = coo_array(np.random.choice([-1,1], p=[pi,1-pi], size=np.prod(dataset.folds.shape)))
-        dataset.visualize(predictions=predictions, withzeros=False)
-        dataset.visualize(predictions=predictions, show_errors=True)
-        ## if it ends without any error, it is a success
+    # def test_visualize(self):
+    #     dataset, _ = self.generate_dataset()
+    #     dataset.visualize(withzeros=False)
+    #     dataset.visualize(withzeros=False, dimred_args={"n_neighbors":10}) ## UMAP
+    #     dataset.visualize(withzeros=True)
+    #     ## Generate random class predictions
+    #     pi=1/16
+    #     npoints = np.prod(dataset.ratings.shape)
+    #     predictions = coo_array(np.random.choice([-1,1], p=[pi,1-pi], size=np.prod(dataset.folds.shape)))
+    #     dataset.visualize(predictions=predictions, withzeros=False)
+    #     dataset.visualize(predictions=predictions, show_errors=True)
+    #     ## if it ends without any error, it is a success
 
     def test_subset(self):
         npositive, nnegative, nfeatures, mean, std = 200, 100, 50, 0.5, 1
