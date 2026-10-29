@@ -6,12 +6,11 @@ from sklearn.metrics import roc_curve as ROC
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from copy import deepcopy
 
 ###################################
 ## LIST OF AVAILABLE METRICS     ##
 ###################################
-from cute_ranking.core import mean_reciprocal_rank, r_precision, precision_at_k, recall_at_k, f1_score_at_k, average_precision, mean_average_precision, dcg_at_k, ndcg_at_k, mean_rank, hit_rate_at_k
+from .ranking import mean_reciprocal_rank, r_precision, precision_at_k, recall_at_k, f1_score_at_k, average_precision, mean_average_precision, dcg_at_k, ndcg_at_k, mean_rank, hit_rate_at_k
 from sklearn.metrics import roc_auc_score, fbeta_score
 from scipy.stats import kendalltau, spearmanr
 
@@ -27,12 +26,12 @@ def ERR(y_true, y_pred, max=10, max_grade=2):
     ranking = ranking[:min(len(ranking), max)]
     ranking = map(float, ranking)
     result = 0.0
-    prob_step_down = 1.0 
+    prob_step_down = 1.0
     for rank, rel in enumerate(ranking):
         rank += 1
         utility = (pow(2, rel) - 1) / pow(2, max_grade)
         result += prob_step_down * utility / rank
-        prob_step_down *= (1 - utility)  
+        prob_step_down *= (1 - utility)
     return result
 AUC = lambda y_true, y_pred, k, u1 : roc_auc_score(y_true, y_pred, average="weighted")
 Fscore = lambda y_true, y_pred, u, beta : fbeta_score(y_true, y_pred, beta=beta, average="weighted")
@@ -101,7 +100,7 @@ def compute_metrics(scores, predictions, dataset, metrics, k=1, beta=1, verbose=
     metrics_list = ["AUC", "Fscore", "TAU", "Rscore", "MRR", "RP", "PrecisionK", "RecallK", "F1K", "AP", "MAP", "DCGk", "NDCGk", "MeanRank", "HRk", "ERR"]
     assert predictions.shape==scores.shape==dataset.folds.shape
     assert all([metric in metrics_list for metric in metrics])
-    y_true_all = dataset.ratings.toarray()[dataset.folds.row,dataset.folds.col].ravel() 
+    y_true_all = dataset.ratings.toarray()[dataset.folds.row,dataset.folds.col].ravel()
     y_pred_all = predictions.data.ravel()
     scores_all = scores.data.ravel()
     assert y_true_all.shape==y_pred_all.shape==scores_all.shape
@@ -138,7 +137,7 @@ def compute_metrics(scores, predictions, dataset, metrics, k=1, beta=1, verbose=
     if (verbose and n_ignored>0):
         print("<validation.compute_metrics> Computed on #users=%d, %d ignored (%2.f perc)" % (len(user_ids), n_ignored, 100*n_ignored/len(user_ids)))
     if (len(aucs)==0 or len(fscores)==0):
-        metrics = pd.DataFrame([], index=metrics, 
+        metrics = pd.DataFrame([], index=metrics,
 		columns=["Average", "StandardDeviation"])
         return metrics, {}
     metrics = pd.DataFrame([[f(metrics_list[m]) for f in [np.mean, np.std]] for m in metrics_list], index=metrics, columns=["Average", "StandardDeviation"])
@@ -251,8 +250,8 @@ def plot_metrics(y_true=None, y_pred=None, scores=None, ground_truth=None, predi
     ids = np.argwhere(labels!=0).flatten().tolist()
     ## Piechart of predicted labels
     h = axes[1,1].pie(counts[ids], labels=[{3:'TP', -3:'FP', 0:'UN', 1: "FN", -1: "TN"}[x] for x in labels[ids]], autopct='%1.1f%%', colors=[{3:'green', -3:'red', 0:'white', 1: "darkred", -1: "darkgreen"}[x] for x in labels[ids]])
-    accuracy = 0 if (3 not in labels) else counts[labels.tolist().index(3)] 
-    accuracy += 0 if (-1 not in labels) else counts[labels.tolist().index(-1)] 
+    accuracy = 0 if (3 not in labels) else counts[labels.tolist().index(3)]
+    accuracy += 0 if (-1 not in labels) else counts[labels.tolist().index(-1)]
     accuracy /= np.sum(counts[ids])
     axes[1,1].text(-1., -1.25, "%d datapoints (%d known matchings)\nAccuracy=%.2f on known matchings" % (np.sum(counts), np.sum(counts[ids]), accuracy))
     ## Show

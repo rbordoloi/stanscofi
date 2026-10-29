@@ -5,7 +5,6 @@ import random
 import numpy as np
 from copy import deepcopy
 from joblib import Parallel, delayed
-from tqdm import tqdm
 from scipy.sparse import coo_array
 
 from scipy.cluster.hierarchy import linkage, fcluster
@@ -59,7 +58,7 @@ def random_simple_split(dataset, test_size, metric="cosine", random_state=1234):
     metric : str
         metric to consider to assess distance between training and testing sets. Should belong to [‘cityblock’, ‘cosine’, ‘euclidean’, ‘l1’, ‘l2’, ‘manhattan’, ‘braycurtis’, ‘canberra’, ‘chebyshev’, ‘correlation’, ‘dice’, ‘hamming’, ‘jaccard’, ‘kulsinski’, ‘mahalanobis’, ‘minkowski’, ‘rogerstanimoto’, ‘russellrao’, ‘seuclidean’, ‘sokalmichener’, ‘sokalsneath’, ‘sqeuclidean’, ‘yule’]
     random_state : int
-        random seed 
+        random seed
 
     Returns
     ----------
@@ -72,15 +71,15 @@ def random_simple_split(dataset, test_size, metric="cosine", random_state=1234):
     y = dataset.ratings.toarray()[dataset.folds.row,dataset.folds.col].ravel() ## values for available ratings
     train_set, test_set,_,_ = train_test_split(X, y, test_size=test_size, random_state=random_state, shuffle=True, stratify=y)
     cv_folds = tuple([
-                coo_array((np.ones(x.shape[0]), (x[:,0].ravel(), x[:,1].ravel())), 
+                coo_array((np.ones(x.shape[0]), (x[:,0].ravel(), x[:,1].ravel())),
                         shape=dataset.folds.shape) for x in [train_set, test_set]
     ])
     item_matrix = np.nan_to_num(dataset.items.toarray(), copy=True, nan=0)
     dist = pairwise_distances(item_matrix.T, metric=metric)
     items_train, item_test = [np.unique(cv_folds[i].row) for i in [0,1]]
     dist_lst = (
-        np.ma.masked_equal(dist[items_train,:][:,item_test], 0.0, copy=True).min(), 
-        np.ma.masked_equal(dist[items_train,:][:,items_train], 0.0, copy=True).min(), 
+        np.ma.masked_equal(dist[items_train,:][:,item_test], 0.0, copy=True).min(),
+        np.ma.masked_equal(dist[items_train,:][:,items_train], 0.0, copy=True).min(),
         np.ma.masked_equal(dist[item_test,:][:,item_test], 0.0, copy=True).min()
     )
     return cv_folds, dist_lst
@@ -111,21 +110,21 @@ def random_cv_split(dataset, cv_generator, metric="cosine"):
     y = dataset.ratings.toarray()[dataset.folds.row,dataset.folds.col].ravel() ## values for available ratings
     cv_folds = [
         (
-            indices_to_folds(train_index, X, dataset.folds.shape), 
+            indices_to_folds(train_index, X, dataset.folds.shape),
             indices_to_folds(test_index, X, dataset.folds.shape)
         ) for train_index, test_index in cv_generator.split(X, y)]
     item_matrix = np.nan_to_num(dataset.items.toarray(), copy=True, nan=0)
     dist = pairwise_distances(item_matrix.T, metric=metric)
     dist_lst = [(
-        np.ma.masked_equal(dist[np.unique(train_folds.row),:][:,np.unique(test_folds.row)], 0.0, copy=True).min(), 
-        np.ma.masked_equal(dist[np.unique(train_folds.row),:][:,np.unique(train_folds.row)], 0.0, copy=True).min(), 
+        np.ma.masked_equal(dist[np.unique(train_folds.row),:][:,np.unique(test_folds.row)], 0.0, copy=True).min(),
+        np.ma.masked_equal(dist[np.unique(train_folds.row),:][:,np.unique(train_folds.row)], 0.0, copy=True).min(),
         np.ma.masked_equal(dist[np.unique(test_folds.row),:][:,np.unique(test_folds.row)], 0.0, copy=True).min()
     ) for train_folds, test_folds in cv_folds]
     return cv_folds, dist_lst
 
 def weakly_correlated_split(dataset, test_size, early_stop=None, metric="cosine", random_state=1234, niter=100, verbose=False):
     '''
-    Splits the data into training and testing datasets with a low correlation among items, by applying a hierarchical clustering on the item feature matrix. NaNs in the item feature matrix are converted to 0. 
+    Splits the data into training and testing datasets with a low correlation among items, by applying a hierarchical clustering on the item feature matrix. NaNs in the item feature matrix are converted to 0.
 
     ...
 
@@ -140,7 +139,7 @@ def weakly_correlated_split(dataset, test_size, early_stop=None, metric="cosine"
     metric : str
         metric to consider to perform hierarchical clustering on the dataset. Should belong to [‘cityblock’, ‘cosine’, ‘euclidean’, ‘l1’, ‘l2’, ‘manhattan’, ‘braycurtis’, ‘canberra’, ‘chebyshev’, ‘correlation’, ‘dice’, ‘hamming’, ‘jaccard’, ‘kulsinski’, ‘mahalanobis’, ‘minkowski’, ‘rogerstanimoto’, ‘russellrao’, ‘seuclidean’, ‘sokalmichener’, ‘sokalsneath’, ‘sqeuclidean’, ‘yule’]
     random_state : int
-        random seed 
+        random seed
     niter : int
         maximum number of iterations of the clustering loop
     verbose : bool
@@ -158,7 +157,7 @@ def weakly_correlated_split(dataset, test_size, early_stop=None, metric="cosine"
     assert test_size > 0 and test_size < 1
     assert metric in ["cityblock", "cosine", "euclidean", "l1", "l2", "manhattan", "braycurtis", "canberra", "chebyshev", "correlation", "dice", "hamming", "jaccard", "kulsinski", "mahalanobis", "minkowski", "rogerstanimoto", "russellrao", "seuclidean", "sokalmichener", "sokalsneath", "sqeuclidean", "yule"]
     np.random.seed(random_state)
-    random.seed(random_state) 
+    random.seed(random_state)
 
     item_matrix = np.nan_to_num(dataset.items.toarray(), copy=True, nan=0)
     train_nset = int((1-test_size)*dataset.folds.data.shape[0])
@@ -200,7 +199,7 @@ def weakly_correlated_split(dataset, test_size, early_stop=None, metric="cosine"
     select_nc = nc
     cluster_size = cluster_size
     ## reproduces an old behavior which did not take into account the test_size parameter and maximizes the distance between training and testing sets
-    #select_nc, cluster_size = 2, 0 
+    #select_nc, cluster_size = 2, 0
     item_labels = (fcluster(Z, select_nc, criterion='maxclust', depth=2, R=None, monocrit=None)>cluster_size+1).astype(int)+1
 
     ## COO-array of shape (n_items, n_users)
@@ -209,8 +208,8 @@ def weakly_correlated_split(dataset, test_size, early_stop=None, metric="cosine"
     test_folds = dataset.folds.toarray()-train_folds
 
     dist_lst = (
-        np.ma.masked_equal(dist[item_labels==1,:][:,item_labels==2], 0.0, copy=True).min(), 
-        np.ma.masked_equal(dist[item_labels==1,:][:,item_labels==1], 0.0, copy=True).min(), 
+        np.ma.masked_equal(dist[item_labels==1,:][:,item_labels==2], 0.0, copy=True).min(),
+        np.ma.masked_equal(dist[item_labels==1,:][:,item_labels==1], 0.0, copy=True).min(),
         np.ma.masked_equal(dist[item_labels==2,:][:,item_labels==2], 0.0, copy=True).min()
     )
 
@@ -236,7 +235,7 @@ def cv_training(template, params, train_dataset, nsplits, metric, k=1, beta=1, t
         dataset to train upon
     nsplits : int
         number of cross-validation steps
-    metric : str 
+    metric : str
         metric to optimize the model upon. Implemented metrics are in validation.py
     k : int (default: 1)
         Argument of the metric to optimize. Implemented metrics are in validation.py
@@ -264,7 +263,7 @@ def cv_training(template, params, train_dataset, nsplits, metric, k=1, beta=1, t
     Returns
     ----------
     results : dict
-        a dictionary which contains 
+        a dictionary which contains
             "models" : list of subinstances of stanscofi.models.BasicModel of length nsplits
                 all trained models
             "train_metric" : list of floats of length nsplits
@@ -339,7 +338,7 @@ def grid_search(search_params, template, params, train_dataset, nsplits, metric,
         dictionary of parameters to initialize the model
     train_dataset : stanscofi.Dataset
         dataset to train upon
-    metric : str 
+    metric : str
         metric to optimize the model upon. Implemented metrics are in validation.py
     k : int (default: 1)
         Argument of the metric to optimize. Implemented metrics are in validation.py
@@ -368,9 +367,9 @@ def grid_search(search_params, template, params, train_dataset, nsplits, metric,
         a dictionary which contains as keys the hyperparameter names and as values the best values obtained across all grid-search steps
     best_model : subinstance of stanscofi.models.BasicModel
         the best trained model associated with the best parameters
-    metrics : dict        
-        a dictionary which contains 
-            "train_metric" : float 
+    metrics : dict
+        a dictionary which contains
+            "train_metric" : float
                 the metric on the training set on the best crossvalidation split for the best set of parameters
             "test_metric" : float
                 the metric on the testing set on the best crossvalidation split for the best set of parameters
